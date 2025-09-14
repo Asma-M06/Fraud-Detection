@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UPI Fraud Detection Dashboard</title>
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    h1, h2 {
+        text-align: center;
+        color: #333;
+    }
+
+    form {
+        background-color: #fff;
+        padding: 30px;
+        border-radius: 15px;
+        width: 400px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+
+    label {
+        display: block;
+        margin-top: 12px;
+        font-weight: 500;
+    }
+
+    input, select {
+        width: 100%;
+        padding: 8px 10px;
+        margin-top: 5px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+    }
+
+    button {
+        margin-top: 20px;
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(90deg, #007BFF, #00C6FF);
+        color: white;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: linear-gradient(90deg, #0056b3, #00A3CC);
+    }
+
+    table {
+        border-collapse: collapse;
+        margin: 20px auto;
+        min-width: 600px;
+        max-width: 800px;
+        background: #fff;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+
+    th, td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+
+    th {
+        background: #007BFF;
+        color: white;
+    }
+
+    tr.safe { background-color: #d4edda; }
+    tr.fraud { background-color: #f8d7da; }
+
+    .charts-container {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+    }
+
+    .chart-box {
+        min-width: 300px;
+        max-width: 400px;
+        background: #fff;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+
+    #toast {
+        visibility: hidden;
+        max-width: 350px;
+        background-color: #333;
+        color: white;
+        text-align: center;
+        border-radius: 12px;
+        padding: 16px 24px;
+        position: fixed;
+        left: 50%;
+        bottom: 30px;
+        font-size: 16px;
+        z-index: 9999;
+        opacity: 0;
+        transform: translate(-50%, 50%) scale(0.7);
+        transition: transform 0.4s ease, opacity 0.4s ease;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+
+    #toast.show {
+        visibility: visible;
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+    }
+
+    #toast i { margin-right: 8px; font-weight: bold; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<h1>UPI Fraud Detection Dashboard</h1>
+
+<!-- Page 1: Form -->
+<div id="formPage">
+    <form id="transactionForm">
+        <h2>New Transaction</h2>
+
+        <label>Transaction ID: <input type="text" id="transaction_id"></label>
+        <label>User ID: <input type="text" id="user_id"></label>
+        <label>Amount: <input type="number" id="amount" value="1000"></label>
+        <label>Location:
+            <select id="location">
+                <option>Delhi</option>
+                <option>Mumbai</option>
+                <option>Bangalore</option>
+                <option>Chennai</option>
+                <option>Hyderabad</option>
+            </select>
+        </label>
+        <label>Device Type:
+            <select id="device_type">
+                <option>Android</option>
+                <option>iOS</option>
+                <option>Web</option>
+            </select>
+        </label>
+        <label>User Age (days): <input type="number" id="user_age_days" value="400"></label>
+        <label>Transactions Last 1 Day: <input type="number" id="transaction_count_last_1_day" value="10"></label>
+        <label>Transactions Last 1 Hour: <input type="number" id="transaction_count_last_1_hour" value="2"></label>
+        <label>Average Amount Last 7 Days: <input type="number" id="average_amount_last_7_days" value="3000"></label>
+        <label>KYC Verified: <input type="checkbox" id="is_kyc_verified" checked></label>
+        <label>Distance from Home (km): <input type="number" id="location_distance_from_home_km" value="120.5"></label>
+        <label>Foreign Device: <input type="checkbox" id="is_foreign_device"></label>
+        <label>Previous Fraud Count: <input type="number" id="previous_fraud_count" value="1"></label>
+
+        <button type="button" onclick="submitTransaction()">Submit</button>
+    </form>
+</div>
+
+<!-- Page 2: Results -->
+<div id="resultPage" style="display:none;">
+    <h2>Transaction Results</h2>
+    <table id="transactionsTable">
+        <thead>
+            <tr>
+                <th>Transaction ID</th>
+                <th>User ID</th>
+                <th>Amount</th>
+                <th>Location</th>
+                <th>Fraud Probability</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <div class="charts-container">
+        <div class="chart-box">
+            <canvas id="fraudPieChart"></canvas>
+        </div>
+        <div class="chart-box">
+            <canvas id="transactionLineChart"></canvas>
+        </div>
+    </div>
+
+    <button onclick="goBack()">← Back to Form</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const transactions = [];
+
+let pieChartCtx = document.getElementById('fraudPieChart').getContext('2d');
+let pieChart = new Chart(pieChartCtx, {
+    type: 'pie',
+    data: {
+        labels: ['Safe', 'Fraud'],
+        datasets: [{
+            data: [0, 0],
+            backgroundColor: ['#28a745', '#dc3545'],
+            hoverOffset: 20
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom', labels: { padding: 20, font: { size: 14 } } },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        let label = context.label || '';
+                        let value = context.raw;
+                        let total = context.dataset.data.reduce((a,b)=>a+b,0);
+                        let percent = total ? ((value/total)*100).toFixed(1) : 0;
+                        return `${label}: ${value} (${percent}%)`;
+                    }
+                }
+            }
+        },
+        animation: { animateRotate: true, duration: 1000 }
+    }
+});
+
+
+let lineChartCtx = document.getElementById('transactionLineChart').getContext('2d');
+let lineChart = new Chart(lineChartCtx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'Fraud Probability',
+            data: [],
+            fill: true,
+            backgroundColor: 'rgba(220,53,69,0.2)',
+            borderColor: '#dc3545',
+            tension: 0.4,
+            pointRadius: 5,
+            pointBackgroundColor: '#dc3545'
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: { beginAtZero:true, max:1, ticks:{ callback: val => (val*100).toFixed(0)+'%' } }
+        },
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return `Fraud Probability: ${(context.raw*100).toFixed(1)}%`;
+                    }
+                }
+            }
+        },
+        animation: { duration: 1000 }
+    }
+});
+
+
+async function predictFraud(data) {
+    const response = await fetch('http://127.0.0.1:5000/predict',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+    });
+    if(!response.ok) throw new Error(`Error: ${response.status}`);
+    return await response.json();
+}
+
+async function submitTransaction() {
+    const data = {
+        transaction_id: document.getElementById('transaction_id').value || crypto.randomUUID(),
+        user_id: document.getElementById('user_id').value || `USR${Math.floor(Math.random()*1000)}`,
+        amount: parseFloat(document.getElementById('amount').value),
+        timestamp: new Date().toISOString(),
+        location: document.getElementById('location').value,
+        device_type: document.getElementById('device_type').value,
+        user_age_days: parseInt(document.getElementById('user_age_days').value),
+        transaction_count_last_1_day: parseInt(document.getElementById('transaction_count_last_1_day').value),
+        transaction_count_last_1_hour: parseInt(document.getElementById('transaction_count_last_1_hour').value),
+        average_amount_last_7_days: parseFloat(document.getElementById('average_amount_last_7_days').value),
+        is_kyc_verified: document.getElementById('is_kyc_verified').checked,
+        location_distance_from_home_km: parseFloat(document.getElementById('location_distance_from_home_km').value),
+        is_foreign_device: document.getElementById('is_foreign_device').checked,
+        previous_fraud_count: parseInt(document.getElementById('previous_fraud_count').value)
+    };
+
+    try {
+        const result = await predictFraud(data);
+        data.is_fraud = result.is_fraud;
+        data.fraud_probability = result.fraud_probability.toFixed(2);
+        transactions.unshift(data);
+        if(transactions.length>10) transactions.pop();
+
+        document.getElementById('formPage').style.display = 'none';
+        document.getElementById('resultPage').style.display = 'block';
+
+        updateTable();
+        updateCharts();
+        showToast(result.is_fraud,result.fraud_probability);
+    } catch(err) {
+        console.error(err);
+        showToast("Error",0);
+    }
+}
+
+function goBack() {
+    document.getElementById('formPage').style.display = 'block';
+    document.getElementById('resultPage').style.display = 'none';
+}
+
+function updateTable() {
+    const tbody = document.querySelector("#transactionsTable tbody");
+    tbody.innerHTML = "";
+    transactions.forEach(txn=>{
+        const row = document.createElement("tr");
+        row.className = txn.is_fraud? "fraud":"safe";
+        row.innerHTML = `
+            <td>${txn.transaction_id}</td>
+            <td>${txn.user_id}</td>
+            <td>${txn.amount}</td>
+            <td>${txn.location}</td>
+            <td>${txn.fraud_probability}</td>
+            <td>${txn.is_fraud? "Fraud":"Safe"}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function updateCharts() {
+    const safeCount = transactions.filter(t=>t.is_fraud==0).length;
+    const fraudCount = transactions.filter(t=>t.is_fraud==1).length;
+    pieChart.data.datasets[0].data = [safeCount,fraudCount];
+    pieChart.update();
+
+    lineChart.data.labels = transactions.map((t,i)=>i+1);
+    lineChart.data.datasets[0].data = transactions.map(t=>t.fraud_probability);
+    lineChart.update();
+}
+
+function showToast(is_fraud,probability) {
+    const toast = document.getElementById("toast");
+    if(is_fraud==="Error") {
+        toast.innerHTML=`<i>⚠️</i> Could not reach API`;
+        toast.style.backgroundColor="#555";
+    } else if(is_fraud==1) {
+        toast.innerHTML=`<i>⚠️</i> Fraud Detected! Probability: ${probability}`;
+        toast.style.backgroundColor="#d9534f";
+    } else {
+        toast.innerHTML=`<i>✅</i> Safe Transaction. Probability: ${probability}`;
+        toast.style.backgroundColor="#5cb85c";
+    }
+    toast.className="show";
+    setTimeout(()=>{ toast.className = toast.className.replace("show",""); },4000);
+}
+</script>
+</body>
+</html>
